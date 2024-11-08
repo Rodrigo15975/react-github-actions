@@ -1,12 +1,17 @@
-name: Node.js CI
+name: Node.js CI/CD
 
 on:
   push:
+    branches: ["master"]
+  pull_request:
     branches: ["master"]
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      NODE_VERSION: "18"
+      SURGE_TOKEN: ${{secrets.SURGE_TOKEN}}
 
     strategy:
       matrix:
@@ -14,17 +19,50 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: "npm"
-          
-      - run: npm i
-      - run: npm run build --if-present
 
-      - name: Install surge
-        run: npm i -g surge
+      - name: Build project
+        run: npm run build --if-present
 
-      - name: Deploy to surge
-        run: surge ./dist materialistic-color.surge.sh --token 9dbb7273cd88454d10f01e3d9d0dcbf3
+      - name: Install Surge
+        run: npm install -g surge
+
+      - name: Deploy to Surge
+        run: surge ./dist materialistic-color.surge.sh --token ${{ env.SURGE_TOKEN }}
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build
+          path: ./dist
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.x
+      - run: npm install
+      - name: Run lint
+        run: npm run lint
+
+  security:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18.x
+      - run: npm install
+      - name: Run security checks
+        run: npm audit --audit-level=high
